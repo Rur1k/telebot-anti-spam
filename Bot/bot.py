@@ -1,18 +1,14 @@
-import config
-import logging
-
-from aiogram import Bot, Dispatcher, executor, types
-
-logging.basicConfig(level=logging.INFO)
-
-bot = Bot(token=config.TOKEN)
-dp = Dispatcher(bot)
+from config import admin_id
+from aiogram import executor
+from load_all import bot, dp
 
 
-@dp.message_handler()
-async def echo(message: types.Message):
-    await message.answer(message.text)
+async def on_shutdown(dp):
+    await bot.close()
 
+
+async def on_startup(dp):
+    await bot.send_message(admin_id, "Я запущен!")
 
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, on_shutdown=on_shutdown, on_startup=on_startup)
