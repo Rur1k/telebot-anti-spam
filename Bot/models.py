@@ -8,29 +8,18 @@ class BaseModel(Model):
         database = pg_db
 
 
-class Status(BaseModel):
-    id = PrimaryKeyField(unique=True)
-    name = CharField(column_name='name', max_length=32)
-
-    class Meta:
-        table_name = 'Status'
-
-
-class Type(BaseModel):
-    id = PrimaryKeyField(unique=True)
-    name = CharField(column_name='name', max_length=32)
-
-    class Meta:
-        table_name = 'Types'
-
-
 class Keyword(BaseModel):
     id = PrimaryKeyField(unique=True)
     word = CharField(column_name='word', max_length=64)
-    type = ForeignKeyField(Type, column_name='type')
 
     class Meta:
         table_name = 'Keywords'
+
+
+class Function(BaseModel):
+    id = PrimaryKeyField(unique=True)
+    name = CharField(max_length=32)
+    is_enable = CharField(max_length=16, default=0)
 
 
 class User(BaseModel):
@@ -45,6 +34,7 @@ class User(BaseModel):
 
 class MessageCount(BaseModel):
     user_id = ForeignKeyField(User, column_name='user_id')
+    message_id = IntegerField()
     message = TextField(column_name='message')
     datetime = DateTimeField(column_name='datetime')
     chat_id = IntegerField(null=True)
