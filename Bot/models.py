@@ -24,6 +24,7 @@ class Function(BaseModel):
 
 class User(BaseModel):
     id_user = PrimaryKeyField(column_name='id')
+    user_name = CharField(max_length=64, null=True)
     datetime = DateTimeField(column_name='datetime')
     is_admin = CharField(max_length=16, column_name='is_admin', default=0)
     chat_id = IntegerField(null=True)

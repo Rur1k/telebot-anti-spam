@@ -2,15 +2,15 @@ from config import admin_id
 from aiogram import types
 from aiogram import executor
 from load_all import bot, dp, pg_db
-from models import User, MessageCount, Function
+from models import User, MessageCount, Function, Keyword
 from peewee import *
 import datetime
 
 
 # Проверка пользователя на уникальность, если такого нет, то делает новую запись с пользователем
-def save_new_user(user_id, chat_id):
+def save_new_user(user_id, chat_id, user_name):
     if not User.select().where(User.id_user == user_id):
-        User.create(id_user=user_id, datetime=datetime.datetime.now(), chat_id=chat_id)
+        User.create(id_user=user_id, datetime=datetime.datetime.now(), chat_id=chat_id, user_name=user_name)
 
 
 # Сохраняет в бд сообщение абонента
@@ -54,9 +54,29 @@ def is_enable(function_id):
         return False
 
 
+# Проверяет вводимое сообщение на наличие запрещенных слов
+def is_forbidden_word(text):
+    forbidden_words = Keyword.select()
+    for word in forbidden_words:
+        if word.word in text.lower():
+            return True
+    return False
+
+
+# Являеться ли введенное сообщение дублем веденного ранее
+def is_repeat_last_message(user_id, chat_id, message):
+    message_id = MessageCount.select(fn.max(MessageCount.id)).where((MessageCount.user_id == user_id) &
+                                                                    (MessageCount.chat_id == chat_id)).scalar()
+    if message_id:
+        last_message = MessageCount.select(MessageCount.message).where(MessageCount.id == message_id).scalar()
+        if message.lower() == last_message.lower():
+            return True
+    return False
+
+
 @dp.message_handler(commands=['start'])
 async def process_start_command(message: types.Message):
-    save_new_user(message.from_user.id, message.chat.id)
+    save_new_user(message.from_user.id, message.chat.id, message.from_user.username)
     create_base_functions()
 
     await message.reply("Ответ на команду старт")
@@ -64,7 +84,7 @@ async def process_start_command(message: types.Message):
 
 @dp.message_handler(commands=['admin'])
 async def process_admin_command(message: types.Message):
-    save_new_user(message.from_user.id, message.chat.id)
+    save_new_user(message.from_user.id, message.chat.id, message.from_user.username)
     await bot.delete_message(message.chat.id, message.message_id)
     if is_admin(message.from_user.id):
         await bot.send_message(message.from_user.id, 'Жду команд')
@@ -74,24 +94,51 @@ async def process_admin_command(message: types.Message):
 
 @dp.message_handler(commands=['giveadmin'])
 async def process_give_admin_command(message: types.Message):
-    save_new_user(message.from_user.id, message.chat.id)
+    save_new_user(message.from_user.id, message.chat.id, message.from_user.username)
     appointment_admin(message.from_user.id)
 
     await bot.delete_message(message.chat.id, message.message_id)
     await bot.send_message(message.from_user.id, "Вы назначены администратором, доступна функиция /admin")
 
 
+@dp.message_handler(commands=['dropoldword'])
+async def delete_old_message(message: types.Message):
+    await bot.delete_message(message.chat.id, message.message_id)
+    if is_admin(message.from_user.id):
+        message_list = MessageCount.select()
+        for one_message in message_list:
+            if is_forbidden_word(one_message.message):
+                MessageCount[one_message.id].delete_instance()
+                await bot.delete_message(one_message.chat_id, one_message.message_id)
+    else:
+        await bot.send_message(message.from_user.id, 'Вы не администратор, комана "/dropoldword" не доступна')
+
+
+@dp.message_handler(commands=['userlist'])
+async def select_users(message: types.Message):
+    user_list = User.select().where(User.chat_id == message.chat.id)
+    users = []
+    for user in user_list:
+        users.append(user.user_name)
+    await bot.send_message(message.from_user.id, users)
+
+
+
+
 @dp.message_handler()
 async def save_user_and_msg(message: types.Message):
-    save_new_user(message.from_user.id, message.chat.id)
+    save_new_user(message.from_user.id, message.chat.id, message.from_user.username)
 
-    # --------------- Проверка на дубль последнего сообщения по пользователю.
-    message_id = MessageCount.select(fn.max(MessageCount.id)).where((MessageCount.user_id == message.from_user.id) &
-                                                                    (MessageCount.chat_id == message.chat.id)).scalar()
-    if message_id:
-        last_message = MessageCount.select(MessageCount.message).where(MessageCount.id == message_id).scalar()
-
-        if (message.text == last_message) and is_enable(2):  # Проверка на дубль сообщение и работу функции удаления, если дубль, удаляет его
+    if is_enable(1):
+        if is_forbidden_word(message.text):
+            await bot.delete_message(message.chat.id, message.message_id)
+        elif is_enable(2):
+            if is_repeat_last_message(message.from_user.id, message.chat.id, message.text):
+                await bot.delete_message(message.chat.id, message.message_id)
+            else:
+                save_message(message.from_user.id, message.chat.id, message.message_id, message.text)
+    elif is_enable(2):
+        if is_repeat_last_message(message.from_user.id, message.chat.id, message.text):
             await bot.delete_message(message.chat.id, message.message_id)
         else:
             save_message(message.from_user.id, message.chat.id, message.message_id, message.text)
