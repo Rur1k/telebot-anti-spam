@@ -120,7 +120,7 @@ async def process_start_command(message: types.Message):
     save_new_user(message.from_user.id, message.chat.id, message.from_user.username)
     create_base_functions()
 
-    await message.send_mesage("Я запустился и буду следить за этим чатом")
+    await bot.send_message(message.chat.id, "Я запустился и буду следить за этим чатом")
 
 
 @dp.message_handler(commands=['admin'])
@@ -129,9 +129,9 @@ async def process_admin_command(message: types.Message):
     await bot.delete_message(message.chat.id, message.message_id)
     if is_admin(message.from_user.id):
         set_state_bot(message.chat.id, 1)
-        await bot.send_message(message.from_user.id, 'Жду команд', reply_markup=keyboard.button_list)
+        await bot.send_message(message.chat.id, 'Жду команд', reply_markup=keyboard.button_list)
     else:
-        await bot.send_message(message.from_user.id, 'Вы не администратор, комана "admin" не доступна')
+        await bot.send_message(message.chat.id, 'Вы не администратор, комана "admin" не доступна')
 
 
 @dp.message_handler(commands=['giveadmin'])
@@ -140,7 +140,7 @@ async def process_give_admin_command(message: types.Message):
     appointment_admin(message.from_user.id)
 
     await bot.delete_message(message.chat.id, message.message_id)
-    await bot.send_message(message.from_user.id, "Вы назначены администратором, доступна функиция /admin")
+    await bot.send_message(message.chat.id, "Вы назначены администратором, доступна функиция /admin")
 
 
 # @dp.message_handler(commands=['dropoldword'])
@@ -189,28 +189,30 @@ async def save_user_and_msg(msg: types.Message):
         if get_state_bot(msg.chat.id) == 1:
             if msg.text == 'Добавить запрещенное слово':
                 set_state_bot(msg.chat.id, 2)
-                await bot.send_message(msg.from_user.id, 'Введите запрещенное слово',
+                await bot.send_message(msg.chat.id, 'Введите запрещенное слово',
                                        reply_markup=keyboard.button_cancel)
             elif msg.text == 'Удалить сообщения с запрещенными словами':
                 set_state_bot(msg.chat.id, 5)
-                await bot.send_message(msg.from_user.id, 'Вы уверены что готовы удалить все сообщения с словами:',
+                await bot.send_message(msg.chat.id, 'Вы уверены что готовы удалить все сообщения с словами:',
                                        reply_markup=keyboard.button_cancel_and_yes)
                 await bot.send_message(msg.chat.id, select_keyword())
             elif msg.text == 'Удалить сообщения по пользователю':
-                await bot.send_message(msg.from_user.id, 'Укажите имя пользователя по которому удалить сообщения, '
+                await bot.send_message(msg.chat.id, 'Укажите имя пользователя по которому удалить сообщения, '
                                                          'для выхода /admin',
                                        reply_markup=keyboard.button_cancel)
                 set_state_bot(msg.chat.id, 3)
                 await bot.send_message(msg.chat.id, select_users(msg.chat.id))
             elif msg.text == 'Настройки':
                 set_state_bot(msg.chat.id, 4)
+                await bot.send_message(msg.chat.id, 'Выбор функции которую надо включить/отключить',
+                                       reply_markup=keyboard.button_setting_details)
         elif get_state_bot(msg.chat.id) == 2:
             if is_keyword(msg.text):
                 Keyword.create(word=msg.text)
-                await bot.send_message(msg.from_user.id, 'Вы добавили слово. Введите еще одно запрещенное слово, '
+                await bot.send_message(msg.chat.id, 'Вы добавили слово. Введите еще одно запрещенное слово, '
                                                          'для выхода введите /admin')
             else:
-                await bot.send_message(msg.from_user.id, 'Слово уже добавлено, введите другое. Для выхода введите '
+                await bot.send_message(msg.chat.id, 'Слово уже добавлено, введите другое. Для выхода введите '
                                                          '/admin')
         elif get_state_bot(msg.chat.id) == 3:
             if User.select().where((User.user_name == msg.text) & (User.chat_id == msg.chat.id)):
@@ -232,7 +234,23 @@ async def save_user_and_msg(msg: types.Message):
                 await bot.send_message(msg.chat.id, 'Сообщения успешно удалены')
             else:
                 await bot.send_message(msg.chat.id, 'Я не знаю такой команды, следуйте инструкциям')
-
+        elif get_state_bot(msg.chat.id) == 4:
+            if msg.text == 'Запрет на дубли сообщений':
+                if is_enable(2):
+                    Function.update(is_enable=0).where(Function.id == 2).execute()
+                    await bot.send_message(msg.chat.id, 'Запрет на дубли - выключена')
+                else:
+                    Function.update(is_enable=1).where(Function.id == 2).execute()
+                    await bot.send_message(msg.chat.id, 'Запрет на дубли - включена')
+            elif msg.text == 'Проверка на ключевые слова':
+                if is_enable(1):
+                    Function.update(is_enable=0).where(Function.id == 1).execute()
+                    await bot.send_message(msg.chat.id, 'Проверка на ключевые слова - выключена')
+                else:
+                    Function.update(is_enable=1).where(Function.id == 1).execute()
+                    await bot.send_message(msg.chat.id, 'Проверка на ключевые слова - включена')
+            else:
+                await bot.send_message(msg.chat.id, 'Я не знаю такой команды, следуйте инструкциям')
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
