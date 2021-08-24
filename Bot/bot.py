@@ -97,15 +97,6 @@ def is_repeat_last_message(user_id, chat_id, message):
     return False
 
 
-# Удаление старых сообщений с запрещенными словами
-# def delete_old_msg(chat_id):
-#     message_list = MessageCount.select().where(MessageCount.chat_id == chat_id)
-#     for one_message in message_list:
-#         if is_forbidden_word(one_message.message):
-#             MessageCount[one_message.id].delete_instance()
-#             await bot.delete_message(one_message.chat_id, one_message.message_id)
-
-
 # Список посльзователей
 def select_users(chat_id):
     user_list = User.select().where(User.chat_id == chat_id)
@@ -115,12 +106,21 @@ def select_users(chat_id):
     return users
 
 
+# Выборка запрещенных слов
+def select_keyword():
+    word_list = Keyword.select()
+    words = []
+    for word in word_list:
+        words.append(word.word)
+    return words
+
+
 @dp.message_handler(commands=['start'])
 async def process_start_command(message: types.Message):
     save_new_user(message.from_user.id, message.chat.id, message.from_user.username)
     create_base_functions()
 
-    await message.reply("Ответ на команду старт")
+    await message.send_mesage("Я запустился и буду следить за этим чатом")
 
 
 @dp.message_handler(commands=['admin'])
@@ -189,11 +189,13 @@ async def save_user_and_msg(msg: types.Message):
         if get_state_bot(msg.chat.id) == 1:
             if msg.text == 'Добавить запрещенное слово':
                 set_state_bot(msg.chat.id, 2)
-                await bot.send_message(msg.from_user.id, 'Введите запрещенное слово', reply_markup=keyboard.button_cancel)
+                await bot.send_message(msg.from_user.id, 'Введите запрещенное слово',
+                                       reply_markup=keyboard.button_cancel)
             elif msg.text == 'Удалить сообщения с запрещенными словами':
                 set_state_bot(msg.chat.id, 5)
                 await bot.send_message(msg.from_user.id, 'Вы уверены что готовы удалить все сообщения с словами:',
-                                       reply_markup=keyboard.button_cancel)
+                                       reply_markup=keyboard.button_cancel_and_yes)
+                await bot.send_message(msg.chat.id, select_keyword())
             elif msg.text == 'Удалить сообщения по пользователю':
                 await bot.send_message(msg.from_user.id, 'Укажите имя пользователя по которому удалить сообщения, '
                                                          'для выхода /admin',
@@ -220,7 +222,16 @@ async def save_user_and_msg(msg: types.Message):
                 await bot.send_message(msg.chat.id, "Сообщения успешно удалены")
             else:
                 await bot.send_message(msg.chat.id, "Данный пользователь не найден. Проверьте корректность ввода имени")
-
+        elif get_state_bot(msg.chat.id) == 5:
+            if msg.text == "Да":
+                message_list = MessageCount.select().where(MessageCount.chat_id == msg.chat.id)
+                for one_message in message_list:
+                    if is_forbidden_word(one_message.message):
+                        MessageCount[one_message.id].delete_instance()
+                        await bot.delete_message(one_message.chat_id, one_message.message_id)
+                await bot.send_message(msg.chat.id, 'Сообщения успешно удалены')
+            else:
+                await bot.send_message(msg.chat.id, 'Я не знаю такой команды, следуйте инструкциям')
 
 
 if __name__ == "__main__":
