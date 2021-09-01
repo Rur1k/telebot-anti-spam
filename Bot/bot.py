@@ -120,7 +120,7 @@ async def process_start_command(message: types.Message):
     save_new_user(message.from_user.id, message.chat.id, message.from_user.username)
     create_base_functions()
 
-    await bot.send_message(message.chat.id, "Я запустился и буду следить за этим чатом")
+    await bot.send_message(message.chat.id, "Я запустился и буду следить за этим чатом. /help - комманды")
 
 
 @dp.message_handler(commands=['admin'])
@@ -131,7 +131,7 @@ async def process_admin_command(message: types.Message):
         set_state_bot(message.chat.id, 1)
         await bot.send_message(message.chat.id, 'Жду команд', reply_markup=keyboard.button_list)
     else:
-        await bot.send_message(message.chat.id, 'Вы не администратор, комана "admin" не доступна')
+        await bot.send_message(message.chat.id, 'Вы не администратор, команда "admin" не доступна')
 
 
 @dp.message_handler(commands=['giveadmin'])
@@ -143,26 +143,12 @@ async def process_give_admin_command(message: types.Message):
     await bot.send_message(message.chat.id, "Вы назначены администратором, доступна функиция /admin")
 
 
-# @dp.message_handler(commands=['dropoldword'])
-# async def delete_old_message(message: types.Message):
-#     await bot.delete_message(message.chat.id, message.message_id)
-#     if is_admin(message.from_user.id):
-#         message_list = MessageCount.select()
-#         for one_message in message_list:
-#             if is_forbidden_word(one_message.message):
-#                 MessageCount[one_message.id].delete_instance()
-#                 await bot.delete_message(one_message.chat_id, one_message.message_id)
-#     else:
-#         await bot.send_message(message.from_user.id, 'Вы не администратор, комана "/dropoldword" не доступна')
-
-
-# @dp.message_handler(commands=['userlist'])
-# async def select_users(message: types.Message):
-#     user_list = User.select().where(User.chat_id == message.chat.id)
-#     users = []
-#     for user in user_list:
-#         users.append(user.user_name)
-#     await bot.send_message(message.from_user.id, users)
+@dp.message_handler(commands=['help'])
+async def process_give_help_command(message: types.Message):
+    save_new_user(message.from_user.id, message.chat.id, message.from_user.username)
+    await bot.send_message(message.chat.id, "/help - получение справки о командах бота")
+    await bot.send_message(message.chat.id, "/giveadmin - команда которая назначает пользователя админом(тестова)")
+    await bot.send_message(message.chat.id, "/admin - доступ для администратора к управлению бота(в админке это 'Назад'")
 
 
 @dp.message_handler()
@@ -198,7 +184,7 @@ async def save_user_and_msg(msg: types.Message):
                 await bot.send_message(msg.chat.id, select_keyword())
             elif msg.text == 'Удалить сообщения по пользователю':
                 await bot.send_message(msg.chat.id, 'Укажите имя пользователя по которому удалить сообщения, '
-                                                         'для выхода /admin',
+                                                    'для выхода /admin',
                                        reply_markup=keyboard.button_cancel)
                 set_state_bot(msg.chat.id, 3)
                 await bot.send_message(msg.chat.id, select_users(msg.chat.id))
@@ -210,10 +196,10 @@ async def save_user_and_msg(msg: types.Message):
             if is_keyword(msg.text):
                 Keyword.create(word=msg.text)
                 await bot.send_message(msg.chat.id, 'Вы добавили слово. Введите еще одно запрещенное слово, '
-                                                         'для выхода введите /admin')
+                                                    'для выхода введите /admin')
             else:
                 await bot.send_message(msg.chat.id, 'Слово уже добавлено, введите другое. Для выхода введите '
-                                                         '/admin')
+                                                    '/admin')
         elif get_state_bot(msg.chat.id) == 3:
             if User.select().where((User.user_name == msg.text) & (User.chat_id == msg.chat.id)):
                 message_list = MessageCount.select().where((MessageCount.chat_id == msg.chat.id) &
@@ -251,6 +237,7 @@ async def save_user_and_msg(msg: types.Message):
                     await bot.send_message(msg.chat.id, 'Проверка на ключевые слова - включена')
             else:
                 await bot.send_message(msg.chat.id, 'Я не знаю такой команды, следуйте инструкциям')
+
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
